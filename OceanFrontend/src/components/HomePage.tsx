@@ -1,12 +1,42 @@
 
-import React from 'react';
-import { Page } from '../types';
+import React, { useEffect, useState } from 'react';
+import { Page, type User } from '../types';
+import { api } from '../utils/api';
 
 interface HomePageProps {
   onNavigate: (page: Page) => void;
+  user: User | null;
+  onLogout: () => void;
 }
 
-export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
+export const HomePage: React.FC<HomePageProps> = ({ onNavigate, user, onLogout }) => {
+  const [stats, setStats] = useState({
+    totalHazards: 0,
+    verifiedReports: 0,
+    avgSeverity: 0,
+  });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const analytics = await api.getAnalytics();
+        if (analytics.data) {
+          setStats({
+            totalHazards: analytics.data.totalReports || 0,
+            verifiedReports: analytics.data.verifiedReports || 0,
+            avgSeverity: analytics.data.avgSeverity || 0,
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching stats:', err);
+      }
+    };
+    fetchStats();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchStats, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   const featureList = [
     { title: 'Hazard Reported', description: 'Anomalies or direct threat is identified and submitted to the OceanGuard system by a community member or automated drone.' },
     { title: 'Data Aggregated', description: 'Our system gathers and cross-references the report with satellite imagery, historical data, and other relevant sources.' },
@@ -38,8 +68,18 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             <a href="#" className="hover:text-white">Contact</a>
           </nav>
           <div className="flex items-center space-x-4">
-            <button className="text-sm bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Sign Up</button>
-            <button className="text-sm text-slate-300 hover:text-white">Login</button>
+            {user ? (
+              <>
+                <button onClick={() => onNavigate(Page.PROFILE)} className="text-sm text-slate-300 hover:text-white">Profile</button>
+                <span className="text-sm text-slate-300">Welcome, {user.name}</span>
+                <button onClick={onLogout} className="text-sm bg-red-600 hover:bg-red-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Logout</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => onNavigate(Page.SIGNUP)} className="text-sm bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors">Sign Up</button>
+                <button onClick={() => onNavigate(Page.LOGIN)} className="text-sm text-slate-300 hover:text-white">Login</button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -77,19 +117,19 @@ export const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </div>
             <div className="md:w-1/2 space-y-4">
                 <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-lg text-left">
-                    <p className="text-sm text-slate-400">Global Threat Level</p>
-                    <p className="text-3xl font-bold text-yellow-400">Moderate</p>
-                    <p className="text-sm text-green-400">+2.1% change this week</p>
+                    <p className="text-sm text-slate-400">Total Hazards</p>
+                    <p className="text-3xl font-bold text-yellow-400">{stats.totalHazards}</p>
+                    <p className="text-sm text-green-400">Active reports</p>
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-lg text-left">
-                    <p className="text-sm text-slate-400">Atlantic Region</p>
-                    <p className="text-3xl font-bold text-green-400">Low</p>
-                    <p className="text-sm text-red-400">-1.8% change this week</p>
+                    <p className="text-sm text-slate-400">Verified Reports</p>
+                    <p className="text-3xl font-bold text-green-400">{stats.verifiedReports}</p>
+                    <p className="text-sm text-blue-400">{stats.totalHazards > 0 ? Math.round((stats.verifiedReports / stats.totalHazards) * 100) : 0}% verified</p>
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-lg text-left">
-                    <p className="text-sm text-slate-400">Pacific Region</p>
-                    <p className="text-3xl font-bold text-red-400">High</p>
-                    <p className="text-sm text-green-400">+5.3% change this week</p>
+                    <p className="text-sm text-slate-400">Average Severity</p>
+                    <p className="text-3xl font-bold text-red-400">{stats.avgSeverity.toFixed(1)}</p>
+                    <p className="text-sm text-slate-400">Out of 10</p>
                 </div>
             </div>
           </div>

@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HazardType } from '../types';
 import { OilSpillIcon, DebrisIcon, PollutionIcon, OtherIcon, LocationIcon } from '../constants';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { LatLng, Icon } from 'leaflet';
+import { Icon } from 'leaflet';
+import { api } from '../utils/api';
+import { useGeolocation } from '../hooks/useGeolocation';
 
 interface ReportHazardWizardProps {
   isOpen: boolean;
@@ -72,6 +74,14 @@ export const ReportHazardWizard: React.FC<ReportHazardWizardProps> = ({ isOpen, 
   const [hazardType, setHazardType] = useState<HazardType>(HazardType.OIL_SPILL);
   const [severity, setSeverity] = useState(5);
   const [location, setLocation] = useState({ lat: 20.0, lng: 0.0 });
+  const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [searchQuery, setSearchQuery] = useState('');
+  const [useCurrentLocation, setUseCurrentLocation] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { latitude, longitude, error: geoError, loading: geoLoading } = useGeolocation();
 
   useEffect(() => {
     if (isOpen) {
@@ -79,25 +89,113 @@ export const ReportHazardWizard: React.FC<ReportHazardWizardProps> = ({ isOpen, 
       setSubmissionStatus('idle');
       setHazardType(HazardType.OIL_SPILL);
       setSeverity(5);
+      setDescription('');
+      setImageUrl(null);
+      setImageFile(null);
+      setErrors({});
+      setLocation({ lat: 20.0, lng: 0.0 });
+      setSearchQuery('');
+      setUseCurrentLocation(false);
+      // Scroll to top when modal opens
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
     }
   }, [isOpen]);
+
+  // Auto-set location from geolocation when available
+  useEffect(() => {
+    if (isOpen && latitude && longitude && !useCurrentLocation) {
+      setLocation({ lat: latitude, lng: longitude });
+      setUseCurrentLocation(true);
+    }
+  }, [latitude, longitude, isOpen, useCurrentLocation]);
+
+  const handleLocationSearch = (query: string) => {
+    setSearchQuery(query);
+    // Try to parse coordinates
+    const coordMatch = query.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lng = parseFloat(coordMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        setLocation({ lat, lng });
+        return;
+      }
+    }
+    // Simple location search
+    const locationMap: { [key: string]: { lat: number; lng: number } } = {
+      'pacific': { lat: 20, lng: -140 },
+      'atlantic': { lat: 30, lng: -40 },
+      'indian': { lat: -10, lng: 70 },
+      'hawaii': { lat: 21.3, lng: -157.8 },
+      'gulf of mexico': { lat: 28.7, lng: -89.5 },
+      'mediterranean': { lat: 35, lng: 18 },
+    };
+    const lowerQuery = query.toLowerCase();
+    for (const [key, coords] of Object.entries(locationMap)) {
+      if (lowerQuery.includes(key)) {
+        setLocation(coords);
+        return;
+      }
+    }
+  };
 
   if (!isOpen) return null;
 
   const totalSteps = 3;
   const progress = (step / totalSteps) * 100;
 
-  const handleNext = () => setStep(prev => Math.min(prev + 1, totalSteps));
-  const handleBack = () => setStep(prev => Math.max(prev - 1, 1));
+  const validateStep = (currentStep: number): boolean => {
+    const newErrors: { [key: string]: string } = {};
+    
+    if (currentStep === 1) {
+      if (!location.lat || !location.lng) {
+        newErrors.location = 'Please select a location on the map';
+      }
+    } else if (currentStep === 2) {
+      if (!hazardType) {
+        newErrors.hazardType = 'Please select a hazard type';
+      }
+      if (severity < 1 || severity > 10) {
+        newErrors.severity = 'Severity must be between 1 and 10';
+      }
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-  const handleSubmit = () => {
+  const handleNext = () => {
+    if (validateStep(step)) {
+      setStep(prev => Math.min(prev + 1, totalSteps));
+    }
+  };
+  
+  const handleBack = () => {
+    setErrors({});
+    setStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const handleSubmit = async () => {
     setSubmissionStatus('submitting');
-    setTimeout(() => {
+    try {
+      await api.createHazardReport({
+        type: hazardType,
+        location,
+        severity,
+        description,
+        imageFile: imageFile || undefined,
+        imageUrl: imageFile ? undefined : (imageUrl || ''), // Only send imageUrl if no file
+      });
       setSubmissionStatus('success');
       setTimeout(() => {
         onSubmit();
       }, 1500);
-    }, 2000);
+    } catch (error: any) {
+      setErrors({ submit: error.message || 'Failed to submit hazard report' });
+      setSubmissionStatus('idle');
+    }
   };
   
   const getStepTitle = () => {
@@ -114,12 +212,48 @@ export const ReportHazardWizard: React.FC<ReportHazardWizardProps> = ({ isOpen, 
       case 1:
         return (
           <div className="relative h-80 flex flex-col">
-            <div className="mb-4">
-              <input type="text" placeholder="Search or click on the map to set location" className="w-full p-3 bg-slate-800/80 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => {
+                    if (latitude && longitude) {
+                      setLocation({ lat: latitude, lng: longitude });
+                      setUseCurrentLocation(true);
+                      setErrors(prev => ({ ...prev, location: '' }));
+                    }
+                  }}
+                  disabled={geoLoading || !latitude || !longitude}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-sm rounded-lg flex items-center space-x-2 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                  </svg>
+                  <span>{geoLoading ? 'Getting location...' : 'Use My Location'}</span>
+                </button>
+                {geoError && (
+                  <span className="text-xs text-yellow-400">{geoError}</span>
+                )}
+                {useCurrentLocation && latitude && longitude && (
+                  <span className="text-xs text-green-400">✓ Using your location</span>
+                )}
+              </div>
+              <input 
+                type="text" 
+                placeholder="Search by location name or coordinates (e.g., 30.0, -40.0)" 
+                className="w-full p-3 bg-slate-800/80 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                value={searchQuery || `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onBlur={() => searchQuery && handleLocationSearch(searchQuery)}
+              />
             </div>
             <div className="flex-grow bg-slate-900/50 rounded-lg">
-                <LocationPicker location={location} setLocation={setLocation} />
+                <LocationPicker location={location} setLocation={(loc) => {
+                  setLocation(loc);
+                  setUseCurrentLocation(false);
+                  setErrors(prev => ({ ...prev, location: '' }));
+                }} />
             </div>
+            {errors.location && <p className="text-red-400 text-sm mt-2">{errors.location}</p>}
           </div>
         );
       case 2:
@@ -145,22 +279,65 @@ export const ReportHazardWizard: React.FC<ReportHazardWizardProps> = ({ isOpen, 
             </div>
             <div>
               <h3 className="text-lg font-semibold text-slate-200 mb-3">Description (Optional)</h3>
-              <textarea placeholder="Add any additional details about the hazard..." rows={4} className="w-full p-3 bg-slate-800/80 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+              <textarea 
+                placeholder="Add any additional details about the hazard..." 
+                rows={4} 
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full p-3 bg-slate-800/80 border border-slate-700 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
             </div>
              <div>
               <h3 className="text-lg font-semibold text-slate-200 mb-3">Upload Photo (Optional)</h3>
-              <input type="file" className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500/10 file:text-blue-300 hover:file:bg-blue-500/20" />
+              <input 
+                type="file" 
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setImageFile(file);
+                    // Create preview URL for display
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setImageUrl(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  } else {
+                    setImageFile(null);
+                    setImageUrl(null);
+                  }
+                }}
+                className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-500/10 file:text-blue-300 hover:file:bg-blue-500/20" 
+              />
+              {imageUrl && (
+                <div className="mt-4">
+                  <img src={imageUrl} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
+                  <p className="text-xs text-slate-400 mt-2">Image will be uploaded when you submit the report</p>
+                </div>
+              )}
             </div>
+            {errors.hazardType && <p className="text-red-400 text-sm mt-2">{errors.hazardType}</p>}
+            {errors.severity && <p className="text-red-400 text-sm mt-2">{errors.severity}</p>}
+            {errors.submit && <p className="text-red-400 text-sm mt-2">{errors.submit}</p>}
           </div>
         );
       case 3:
+        const getSeverityLabel = (sev: number) => {
+          if (sev <= 3) return 'Low';
+          if (sev <= 6) return 'Medium';
+          if (sev <= 8) return 'High';
+          return 'Critical';
+        };
+        
         return (
           <div className="space-y-4">
-            {[{label: 'Location', value: `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`, icon: <LocationIcon className="w-5 h-5 text-slate-400"/> },
-             {label: 'Hazard Type', value: hazardType, icon: <OtherIcon className="w-5 h-5 text-slate-400"/>},
-             {label: 'Severity', value: `High (${severity}/10)`, icon: <svg className="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1-8h-2V7h2v2z"/></svg>},
-             {label: 'Photo', value: <img src="https://picsum.photos/seed/review/100/60" alt="hazard" className="rounded-md"/>, icon: <svg className="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>},
-             {label: 'Description', value: 'A large, dark patch spotted near the coast. Approximately 2 miles.', icon: <svg className="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>}].map(item => (
+            {[
+             {label: 'Location', value: `Lat: ${location.lat.toFixed(4)}, Lng: ${location.lng.toFixed(4)}`, icon: <LocationIcon className="w-5 h-5 text-slate-400"/>, step: 1 },
+             {label: 'Hazard Type', value: hazardType, icon: <OtherIcon className="w-5 h-5 text-slate-400"/>, step: 2},
+             {label: 'Severity', value: `${getSeverityLabel(severity)} (${severity}/10)`, icon: <svg className="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1-8h-2V7h2v2z"/></svg>, step: 2},
+             {label: 'Photo', value: imageUrl ? <img src={imageUrl} alt="hazard" className="rounded-md w-full h-24 object-cover"/> : <span className="text-slate-400">No photo uploaded</span>, icon: <svg className="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>, step: 2},
+             {label: 'Description', value: description || <span className="text-slate-400">No description provided</span>, icon: <svg className="w-5 h-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>, step: 2}
+            ].map(item => (
                 <div key={item.label} className="flex items-start justify-between p-4 bg-slate-800/50 rounded-lg">
                     <div className="flex items-start">
                         <div className="mr-4 mt-1">{item.icon}</div>
@@ -169,7 +346,7 @@ export const ReportHazardWizard: React.FC<ReportHazardWizardProps> = ({ isOpen, 
                             <div className="text-slate-100">{item.value}</div>
                         </div>
                     </div>
-                    <button className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded-md" onClick={() => setStep(item.label === 'Location' ? 1 : 2)}>Edit</button>
+                    <button className="text-sm bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded-md" onClick={() => setStep(item.step)}>Edit</button>
                 </div>
             ))}
           </div>
@@ -181,11 +358,20 @@ export const ReportHazardWizard: React.FC<ReportHazardWizardProps> = ({ isOpen, 
 
   return (
     <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-slate-800/80 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl text-white">
-        <div className="p-8">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold">Report a New Hazard</h2>
-            <p className="text-slate-400">Step {step}: {getStepTitle()}</p>
+      <div className="bg-slate-800/80 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl text-white max-h-[90vh] flex flex-col">
+        <div className="p-8 flex-shrink-0">
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h2 className="text-2xl font-bold">Report a New Hazard</h2>
+              <p className="text-slate-400">Step {step}: {getStepTitle()}</p>
+            </div>
+            <button 
+              onClick={onClose}
+              className="text-slate-400 hover:text-white text-2xl leading-none"
+              disabled={submissionStatus === 'submitting'}
+            >
+              &times;
+            </button>
           </div>
           <div className="mb-6">
             <div className="w-full bg-slate-700 rounded-full h-1.5">
@@ -193,6 +379,12 @@ export const ReportHazardWizard: React.FC<ReportHazardWizardProps> = ({ isOpen, 
             </div>
             <p className="text-right text-sm text-slate-400 mt-2">Step {step} of {totalSteps}</p>
           </div>
+        </div>
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto px-8 pb-4"
+          style={{ maxHeight: 'calc(90vh - 200px)' }}
+        >
           <div className="min-h-[300px]">
             {renderStepContent()}
           </div>

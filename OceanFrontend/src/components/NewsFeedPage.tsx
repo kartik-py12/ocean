@@ -1,19 +1,38 @@
 
-import React, { useState } from 'react';
-import { newsArticles } from '../constants';
-import { Page } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Page, type User, type NewsArticle } from '../types';
+import { api } from '../utils/api';
 
 interface NewsFeedPageProps {
   onNavigate: (page: Page) => void;
+  user: User | null;
 }
 
-const NewsCard: React.FC<{ article: typeof newsArticles[0] }> = ({ article }) => (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden group">
+const NewsCard: React.FC<{ article: NewsArticle; isFromReport?: boolean }> = ({ article, isFromReport }) => (
+    <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden group hover:border-blue-500/50 transition-all">
         <div className="relative">
-            <img src={article.imageUrl} alt={article.title} className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300" />
+            <img 
+                src={article.imageUrl} 
+                alt={article.title} 
+                className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                onError={(e) => {
+                    e.currentTarget.src = 'https://picsum.photos/seed/news/400/300';
+                }}
+            />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+            <div className="absolute top-2 right-2 flex gap-2">
+                {isFromReport && (
+                    <span className="bg-blue-600/90 text-white text-xs font-bold px-2 py-1 rounded-full">
+                        User Report
+                    </span>
+                )}
+                <span className="bg-slate-800/90 text-white text-xs font-semibold px-2 py-1 rounded-full">
+                    {article.category}
+                </span>
+            </div>
             <div className="absolute bottom-0 left-0 p-4">
                 <h3 className="text-xl font-bold text-white">{article.title}</h3>
+                <p className="text-xs text-slate-300 mt-1">{article.date}</p>
             </div>
         </div>
         <div className="p-4">
@@ -22,16 +41,88 @@ const NewsCard: React.FC<{ article: typeof newsArticles[0] }> = ({ article }) =>
     </div>
 );
 
-export const NewsFeedPage: React.FC<NewsFeedPageProps> = ({ onNavigate }) => {
+export const NewsFeedPage: React.FC<NewsFeedPageProps> = ({ onNavigate, user }) => {
+    const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
     const [currentPage, setCurrentPage] = useState(1);
+    const [hazardTypeFilter, setHazardTypeFilter] = useState<string>('all');
+    const [regionFilter, setRegionFilter] = useState<string>('all');
+    const [dateFilter, setDateFilter] = useState<string>('');
+    const [sortBy, setSortBy] = useState<string>('latest-reports');
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const articlesPerPage = 8;
-    const totalPages = Math.ceil(newsArticles.length / articlesPerPage);
+
+    // Fetch news articles from backend
+    useEffect(() => {
+        const fetchNews = async () => {
+            try {
+                setLoading(true);
+                const category = hazardTypeFilter !== 'all' ? hazardTypeFilter : undefined;
+                const response = await api.getNewsArticles({ 
+                    category, 
+                    limit: 100, 
+                    sortBy 
+                });
+                // Transform backend data
+                const transformedArticles: NewsArticle[] = response.data.map((article: any) => {
+                    // Handle image URL - if it's a relative path, make it absolute
+                    let imageUrl = article.imageUrl;
+                    if (imageUrl && !imageUrl.startsWith('http') && imageUrl.startsWith('/uploads')) {
+                        imageUrl = `http://localhost:3000${imageUrl}`;
+                    }
+                    
+                    return {
+                        id: article._id || article.id,
+                        title: article.title,
+                        summary: article.summary,
+                        imageUrl: imageUrl || 'https://picsum.photos/seed/news/400/300',
+                        category: article.category,
+                        date: article.date ? new Date(article.date).toISOString().split('T')[0] : new Date(article.createdAt).toISOString().split('T')[0],
+                        hazardReportId: article.hazardReportId || null,
+                    };
+                });
+                setNewsArticles(transformedArticles);
+                setError(null);
+            } catch (err: any) {
+                setError(err.message || 'Failed to load news articles');
+                console.error('Error fetching news:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchNews();
+        // Poll for updates every 60 seconds
+        const interval = setInterval(fetchNews, 60000);
+        return () => clearInterval(interval);
+    }, [hazardTypeFilter, sortBy]);
+
+    // Filter articles by date
+    const filteredArticles = newsArticles.filter(article => {
+        if (dateFilter && article.date !== dateFilter) {
+            return false;
+        }
+        return true;
+    });
+
+    const totalPages = Math.ceil(filteredArticles.length / articlesPerPage);
+    const displayedArticles = filteredArticles.slice((currentPage - 1) * articlesPerPage, currentPage * articlesPerPage);
 
     const handlePageChange = (page: number) => {
         if (page > 0 && page <= totalPages) {
             setCurrentPage(page);
         }
     };
+
+    const handleFilterChange = () => {
+        setCurrentPage(1); // Reset to first page when filters change
+    };
+
+    // Get unique categories and regions
+    const categories = newsArticles.length > 0 
+      ? ['all', ...Array.from(new Set(newsArticles.map(a => a.category)))]
+      : ['all', 'Oil Spill', 'Debris', 'Pollution', 'Climate', 'Weather', 'Geological', 'Other'];
+    const regions = ['all', 'Pacific', 'Atlantic', 'Indian', 'Arctic', 'Mediterranean'];
 
     return (
         <div className="min-h-screen bg-slate-900" style={{ backgroundImage: "url('https://picsum.photos/seed/newsbg/1920/1080')", backgroundAttachment: 'fixed', backgroundSize: 'cover' }}>
@@ -61,29 +152,98 @@ export const NewsFeedPage: React.FC<NewsFeedPageProps> = ({ onNavigate }) => {
                         <p className="text-lg text-slate-300 mt-2">The latest updates on marine environmental dangers and events.</p>
                     </div>
 
+                    {loading && (
+                        <div className="text-center py-12">
+                            <div className="inline-flex items-center space-x-2 text-blue-400">
+                                <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span>Loading news articles...</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4">
+                            {error}
+                        </div>
+                    )}
+
                     {/* Filters */}
                     <div className="flex flex-wrap gap-4 items-center justify-center mb-8 bg-slate-800/60 p-4 rounded-xl border border-slate-700">
-                        <select className="bg-slate-700 border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option>Hazard Type</option>
-                            <option>Oil Spill</option>
-                            <option>Debris</option>
-                            <option>Pollution</option>
+                        <select 
+                            value={hazardTypeFilter}
+                            onChange={(e) => { setHazardTypeFilter(e.target.value); handleFilterChange(); }}
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="all">All Hazard Types</option>
+                            {categories.filter(c => c !== 'all').map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
                         </select>
-                        <select className="bg-slate-700 border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option>Region</option>
+                        <select 
+                            value={regionFilter}
+                            onChange={(e) => { setRegionFilter(e.target.value); handleFilterChange(); }}
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {regions.map(region => (
+                                <option key={region} value={region}>{region === 'all' ? 'All Regions' : region}</option>
+                            ))}
                         </select>
-                        <input type="date" className="bg-slate-700 border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        <select className="bg-slate-700 border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option>Sort By</option>
+                        <input 
+                            type="date" 
+                            value={dateFilter}
+                            onChange={(e) => { setDateFilter(e.target.value); handleFilterChange(); }}
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                        />
+                        <select 
+                            value={sortBy}
+                            onChange={(e) => { setSortBy(e.target.value); handleFilterChange(); }}
+                            className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="date-desc">Newest First</option>
+                            <option value="date-asc">Oldest First</option>
+                            <option value="title-asc">Title (A-Z)</option>
+                            <option value="title-desc">Title (Z-A)</option>
                         </select>
+                        {(hazardTypeFilter !== 'all' || regionFilter !== 'all' || dateFilter) && (
+                            <button 
+                                onClick={() => {
+                                    setHazardTypeFilter('all');
+                                    setRegionFilter('all');
+                                    setDateFilter('');
+                                    handleFilterChange();
+                                }}
+                                className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-semibold transition-colors"
+                            >
+                                Clear Filters
+                            </button>
+                        )}
                     </div>
 
+                    {/* Results count */}
+                    {!loading && filteredArticles.length === 0 ? (
+                        <div className="text-center py-12">
+                            <p className="text-slate-400 text-lg">No articles found matching your filters.</p>
+                        </div>
+                    ) : !loading && (
+                        <>
+                            <div className="text-center mb-4 text-slate-400">
+                                Showing {displayedArticles.length} of {filteredArticles.length} articles
+                            </div>
                     {/* News Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {newsArticles.slice((currentPage - 1) * articlesPerPage, currentPage * articlesPerPage).map(article => (
-                            <NewsCard key={article.id} article={article} />
+                                {displayedArticles.map(article => (
+                            <NewsCard 
+                                key={article.id} 
+                                article={article} 
+                                isFromReport={!!article.hazardReportId}
+                            />
                         ))}
                     </div>
+                        </>
+                    )}
 
                     {/* Pagination */}
                     <div className="flex justify-center items-center mt-12 space-x-2">

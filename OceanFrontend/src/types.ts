@@ -4,6 +4,9 @@ export enum Page {
     MAP,
     NEWS,
     ANALYTICS,
+    LOGIN,
+    SIGNUP,
+    PROFILE,
 }
 
 export enum HazardType {
@@ -35,12 +38,13 @@ export interface HazardReport {
 }
 
 export interface NewsArticle {
-    id: number;
+    id: number | string;
     title: string;
     summary: string;
     imageUrl: string;
     category: string;
     date: string;
+    hazardReportId?: string | null;
 }
 
 export interface MentionData {
@@ -64,4 +68,11 @@ export interface SocialMediaReport {
     };
     timestamp: string;
     userAvatar: string;
+}
+
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    createdAt?: string;
 }

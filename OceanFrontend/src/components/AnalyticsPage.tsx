@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { mentionVolumeData, topKeywords, highImpactPosts, sentimentData, emergingThreatsData, topInfluencersData } from '../constants';
-import { Page } from '../types';
+import { Page, HazardType, type User, type HazardReport } from '../types';
+import { api } from '../utils/api';
 
 interface AnalyticsPageProps {
   onNavigate: (page: Page) => void;
+  user: User | null;
 }
 
 const AnalyticsSidebar: React.FC<{ activePage: string; onNav: (page: string) => void }> = ({ activePage, onNav }) => {
@@ -49,18 +51,219 @@ const StatCard: React.FC<{ title: string; value: string; change?: string; change
     </div>
 );
 
-export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
-    const [activePage, setActivePage] = useState('Social Analytics');
+export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate, user }) => {
+    const [activePage, setActivePage] = useState('Dashboard');
+    const [hazardReports, setHazardReports] = useState<HazardReport[]>([]);
+    const [analyticsData, setAnalyticsData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     
     const handleSidebarNav = (page: string) => {
         if (page === 'Map View') onNavigate(Page.MAP);
         else setActivePage(page);
     };
 
+    // Fetch analytics data
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                // Fetch hazard reports
+                const hazardsResponse = await api.getHazardReports({ limit: 1000 });
+                const transformedReports: HazardReport[] = hazardsResponse.data.map((report: any) => ({
+                    id: report._id || report.id,
+                    type: report.type as HazardType,
+                    location: report.location,
+                    severity: report.severity,
+                    description: report.description || '',
+                    reportedBy: typeof report.reportedBy === 'object' ? report.reportedBy.name : report.reportedBy || 'Unknown',
+                    timestamp: report.timestamp ? new Date(report.timestamp).toLocaleString() : new Date(report.createdAt).toLocaleString(),
+                    imageUrl: report.imageUrl 
+                      ? (report.imageUrl.startsWith('http') || report.imageUrl.startsWith('/uploads') 
+                          ? report.imageUrl 
+                          : `http://localhost:3000${report.imageUrl}`)
+                      : 'https://picsum.photos/seed/hazard/400/300',
+                    verified: report.verified || false,
+                }));
+                setHazardReports(transformedReports);
+
+                // Fetch analytics
+                const analyticsResponse = await api.getAnalytics();
+                setAnalyticsData(analyticsResponse.data);
+                setError(null);
+            } catch (err: any) {
+                setError(err.message || 'Failed to load analytics');
+                console.error('Error fetching analytics:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        // Refresh every 60 seconds
+        const interval = setInterval(fetchData, 60000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <div className="flex h-screen bg-slate-900 text-slate-300">
             <AnalyticsSidebar activePage={activePage} onNav={handleSidebarNav} />
             <main className="flex-1 p-8 overflow-y-auto" style={{ backgroundImage: "radial-gradient(circle at top right, rgba(14, 165, 233, 0.1), transparent 40%)" }}>
+                {loading && (
+                    <div className="flex items-center justify-center h-64">
+                        <div className="text-center">
+                            <svg className="animate-spin h-12 w-12 text-blue-400 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p className="text-slate-400">Loading analytics...</p>
+                        </div>
+                    </div>
+                )}
+
+                {error && (
+                    <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-4">
+                        {error}
+                    </div>
+                )}
+
+                {!loading && activePage === 'Dashboard' && (
+                    <>
+                        <h1 className="text-3xl font-bold text-white mb-2">Analytics Dashboard</h1>
+                        <p className="text-slate-400 mb-8">Comprehensive overview of ocean hazard monitoring</p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                            <StatCard 
+                                title="Total Hazards" 
+                                value={analyticsData?.totalReports?.toString() || hazardReports.length.toString()} 
+                                change={analyticsData ? `+${Math.max(0, analyticsData.totalReports - (analyticsData.totalReports * 0.9)).toFixed(0)} this week` : "+3 this week"} 
+                                changeType="positive" 
+                            />
+                            <StatCard 
+                                title="Verified Reports" 
+                                value={analyticsData?.verifiedReports?.toString() || hazardReports.filter(r => r.verified).length.toString()} 
+                                change={analyticsData ? `${Math.round((analyticsData.verifiedReports / analyticsData.totalReports) * 100)}% verified` : `${hazardReports.length > 0 ? Math.round((hazardReports.filter(r => r.verified).length / hazardReports.length) * 100) : 0}% verified`} 
+                                changeType="positive" 
+                            />
+                            <StatCard 
+                                title="Avg Severity" 
+                                value={analyticsData?.avgSeverity?.toFixed(1) || (hazardReports.length > 0 ? (hazardReports.reduce((sum, r) => sum + r.severity, 0) / hazardReports.length).toFixed(1) : '0.0')} 
+                                change="Moderate" 
+                                changeType="negative" 
+                            />
+                            <StatCard title="Active Regions" value="12" change="Global coverage" changeType="positive" />
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                            <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-xl">
+                                <h2 className="text-xl font-semibold text-white mb-4">Hazards by Type</h2>
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie 
+                                                data={analyticsData?.reportsByType?.map((item: any) => ({
+                                                    name: item._id,
+                                                    value: item.count
+                                                })) || Object.entries(HazardType).map(([, value]) => ({
+                                                    name: value,
+                                                    value: hazardReports.filter(r => r.type === value).length
+                                                }))} 
+                                                dataKey="value" 
+                                                nameKey="name" 
+                                                cx="50%" 
+                                                cy="50%" 
+                                                outerRadius={80} 
+                                                label
+                                            >
+                                                {Object.entries(HazardType).map((_, index) => (
+                                                    <Cell key={`cell-${index}`} fill={['#ef4444', '#f97316', '#06b6d4', '#8b5cf6'][index]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                            <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-xl">
+                                <h2 className="text-xl font-semibold text-white mb-4">Severity Distribution</h2>
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={analyticsData?.severityDistribution?.map((item: any) => ({
+                                            range: item._id === 'other' ? '9-10' : item._id,
+                                            count: item.count
+                                        })) || [
+                                            { range: '1-3', count: hazardReports.filter(r => r.severity <= 3).length },
+                                            { range: '4-6', count: hazardReports.filter(r => r.severity >= 4 && r.severity <= 6).length },
+                                            { range: '7-8', count: hazardReports.filter(r => r.severity >= 7 && r.severity <= 8).length },
+                                            { range: '9-10', count: hazardReports.filter(r => r.severity >= 9).length },
+                                        ]}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                                            <XAxis dataKey="range" stroke="#9ca3af" fontSize={12} />
+                                            <YAxis stroke="#9ca3af" fontSize={12} />
+                                            <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                                            <Bar dataKey="count" fill="#38bdf8" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {!loading && activePage === 'Reports' && (
+                    <>
+                        <h1 className="text-3xl font-bold text-white mb-2">Hazard Reports</h1>
+                        <p className="text-slate-400 mb-8">Detailed view of all reported ocean hazards</p>
+                        
+                        <div className="bg-slate-800/50 border border-slate-700 p-6 rounded-xl">
+                            {hazardReports.length === 0 ? (
+                                <div className="text-center py-12 text-slate-400">
+                                    <p>No hazard reports found.</p>
+                                </div>
+                            ) : (
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b border-slate-700 text-sm text-slate-400">
+                                            <th className="py-2">Type</th>
+                                            <th className="py-2">Location</th>
+                                            <th className="py-2">Severity</th>
+                                            <th className="py-2">Status</th>
+                                            <th className="py-2">Reported</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {hazardReports.map((report) => (
+                                        <tr key={report.id} className="border-b border-slate-800 hover:bg-slate-700/50">
+                                            <td className="py-4 font-semibold text-white">{report.type}</td>
+                                            <td className="py-4 text-slate-300">{report.location.lat.toFixed(2)}°, {report.location.lng.toFixed(2)}°</td>
+                                            <td className="py-4">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                                    report.severity >= 7 ? 'bg-red-500/20 text-red-300' :
+                                                    report.severity >= 4 ? 'bg-yellow-500/20 text-yellow-300' :
+                                                    'bg-green-500/20 text-green-300'
+                                                }`}>
+                                                    {report.severity}/10
+                                                </span>
+                                            </td>
+                                            <td className="py-4">
+                                                {report.verified ? (
+                                                    <span className="text-green-400 font-semibold">Verified</span>
+                                                ) : (
+                                                    <span className="text-yellow-400 font-semibold">Pending</span>
+                                                )}
+                                            </td>
+                                            <td className="py-4 text-slate-400">{report.timestamp}</td>
+                                        </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {!loading && activePage === 'Social Analytics' && (
+                    <>
                 <h1 className="text-3xl font-bold text-white mb-2">Social Media Analytics Dashboard</h1>
                 <p className="text-slate-400 mb-8">Real-time insights on ocean hazard conversations</p>
                 
@@ -191,7 +394,8 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
                         </tbody>
                     </table>
                  </div>
-
+                    </>
+                )}
             </main>
         </div>
     );

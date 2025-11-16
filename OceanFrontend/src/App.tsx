@@ -5,35 +5,77 @@ import { MapPage } from './components/MapPage';
 import { NewsFeedPage } from './components/NewsFeedPage';
 import { AnalyticsPage } from './components/AnalyticsPage';
 import { ReportHazardWizard } from './components/ReportHazardWizard';
-import { Page } from './types';
+import { LoginPage } from './components/LoginPage';
+import { SignupPage } from './components/SignupPage';
+import { ProfilePage } from './components/ProfilePage';
+import { Page, type User } from './types';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
   const [isReporting, setIsReporting] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check for existing session
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   const handleNavigate = (page: Page) => {
     setCurrentPage(page);
+  };
+
+  const handleLogin = (email: string, authToken: string) => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setToken(authToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setToken(null);
+    setCurrentPage(Page.HOME);
   };
 
   const handleReportSubmit = () => {
     setIsReporting(false);
     setShowSuccessToast(true);
     setTimeout(() => setShowSuccessToast(false), 5000);
+    // Trigger a page refresh or data reload if on map page
+    if (currentPage === Page.MAP) {
+      // The MapPage will auto-refresh due to its polling mechanism
+      window.dispatchEvent(new Event('hazardReportSubmitted'));
+    }
   };
 
   const renderPage = () => {
     switch (currentPage) {
       case Page.HOME:
-        return <HomePage onNavigate={handleNavigate} />;
+        return <HomePage onNavigate={handleNavigate} user={user} onLogout={handleLogout} />;
       case Page.MAP:
-        return <MapPage onReportHazard={() => setIsReporting(true)} onNavigate={handleNavigate} />;
+        return <MapPage onReportHazard={() => setIsReporting(true)} onNavigate={handleNavigate} user={user} />;
       case Page.NEWS:
-        return <NewsFeedPage onNavigate={handleNavigate} />;
+        return <NewsFeedPage onNavigate={handleNavigate} user={user} />;
       case Page.ANALYTICS:
-        return <AnalyticsPage onNavigate={handleNavigate} />;
+        return <AnalyticsPage onNavigate={handleNavigate} user={user} />;
+      case Page.LOGIN:
+        return <LoginPage onNavigate={handleNavigate} onLogin={handleLogin} />;
+      case Page.SIGNUP:
+        return <SignupPage onNavigate={handleNavigate} onLogin={handleLogin} />;
+      case Page.PROFILE:
+        return <ProfilePage onNavigate={handleNavigate} user={user} onLogout={handleLogout} />;
       default:
-        return <HomePage onNavigate={handleNavigate} />;
+        return <HomePage onNavigate={handleNavigate} user={user} onLogout={handleLogout} />;
     }
   };
 
