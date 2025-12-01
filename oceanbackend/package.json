@@ -20,6 +20,8 @@
   "dependencies": {
     "@types/multer": "^2.0.0",
     "@types/nodemailer": "^7.0.3",
+    "@types/sentiment": "^5.0.4",
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -29,7 +31,8 @@
     "mongoose": "^8.0.3",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.10",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "sentiment": "^5.0.2"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
