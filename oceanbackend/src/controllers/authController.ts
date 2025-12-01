@@ -21,6 +21,7 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 
     // Create new user
     const user = await User.create({ name, email, password });
+    console.log(user);
     const token = generateToken(user._id.toString());
 
     res.status(201).json({

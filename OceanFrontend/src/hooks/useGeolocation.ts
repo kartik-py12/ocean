@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 interface GeolocationState {
   latitude: number | null;
@@ -14,10 +14,10 @@ export const useGeolocation = () => {
     longitude: null,
     accuracy: null,
     error: null,
-    loading: true,
+    loading: false,
   });
 
-  useEffect(() => {
+  const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setState(prev => ({
         ...prev,
@@ -26,6 +26,8 @@ export const useGeolocation = () => {
       }));
       return;
     }
+
+    setState(prev => ({ ...prev, loading: true, error: null }));
 
     const options: PositionOptions = {
       enableHighAccuracy: true,
@@ -47,13 +49,13 @@ export const useGeolocation = () => {
         let errorMessage = 'Unknown error occurred';
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage = 'User denied the request for geolocation';
+            errorMessage = 'Location permission denied';
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage = 'Location information is unavailable';
             break;
           case error.TIMEOUT:
-            errorMessage = 'The request to get user location timed out';
+            errorMessage = 'Location request timed out';
             break;
         }
         setState(prev => ({
@@ -66,6 +68,6 @@ export const useGeolocation = () => {
     );
   }, []);
 
-  return state;
+  return { ...state, requestLocation };
 };
 
