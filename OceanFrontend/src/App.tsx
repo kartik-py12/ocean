@@ -9,6 +9,7 @@ import { LoginPage } from './components/LoginPage';
 import { SignupPage } from './components/SignupPage';
 import { ProfilePage } from './components/ProfilePage';
 import { NotificationCenter } from './components/NotificationCenter';
+import { GovernmentAlertsPage } from './components/GovernmentAlertsPage';
 import { Page, type User } from './types';
 import { io, Socket } from 'socket.io-client';
 
@@ -140,6 +141,8 @@ const App: React.FC = () => {
         return <SignupPage onNavigate={handleNavigate} onLogin={handleLogin} />;
       case Page.PROFILE:
         return <ProfilePage onNavigate={handleNavigate} user={user} onLogout={handleLogout} />;
+      case Page.GOVERNMENT_ALERTS:
+        return <GovernmentAlertsPage onNavigate={handleNavigate} user={user} />;
       default:
         return <HomePage onNavigate={handleNavigate} user={user} onLogout={handleLogout} />;
     }

@@ -10,6 +10,7 @@ import newsRoutes from './routes/newsRoutes';
 import analyticsRoutes from './routes/analyticsRoutes';
 import userRoutes from './routes/userRoutes';
 import socialMediaRoutes from './routes/socialMediaRoutes';
+import governmentAlertsRoutes from './routes/governmentAlertsRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -51,6 +52,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/social-media', socialMediaRoutes);
+app.use('/api/government', governmentAlertsRoutes);
 
 // Health check
 app.get('/api/health', (req: Request, res: Response) => {

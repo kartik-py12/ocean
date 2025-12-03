@@ -175,4 +175,30 @@ export const api = {
       }>;
     }>(`/social-media/analytics${query}`);
   },
+
+  // Government Alerts endpoints
+  async getGovernmentAlerts() {
+    return this.request<{
+      data: any[];
+      summary: {
+        total: number;
+        weather: number;
+        tsunami: number;
+        earthquake: number;
+      };
+      lastUpdated: string;
+    }>('/government/alerts');
+  },
+
+  async getOceanWeather(lat: number, lng: number) {
+    return this.request<{
+      data: any;
+    }>(`/government/weather?lat=${lat}&lng=${lng}`);
+  },
+
+  async getMarineForecast(lat: number, lng: number) {
+    return this.request<{
+      data: any;
+    }>(`/government/forecast?lat=${lat}&lng=${lng}`);
+  },
 };

@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, ImageOverlay, useMap } from 'react-lea
 import { divIcon, Map as LeafletMap } from 'leaflet';
 import { HazardType, Page, type HazardReport, type SocialMediaReport, type User } from '../types';
 import { api } from '../utils/api';
+import { OceanWeatherWidget } from './OceanWeatherWidget';
 
 interface MapPageProps {
   onReportHazard: () => void;
@@ -89,9 +90,13 @@ interface SidebarProps {
   onNavigate: (page: Page) => void;
   timeRange: number;
   onTimeRangeChange: (value: number) => void;
+  activeFilters: HazardType[];
+  onToggleFilter: (type: HazardType) => void;
+  showOceanWeather: boolean;
+  onToggleOceanWeather: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ showHeatmap, onToggleHeatmap, showSocialMedia, onToggleSocialMedia, onNavigate, timeRange, onTimeRangeChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({ showHeatmap, onToggleHeatmap, showSocialMedia, onToggleSocialMedia, onNavigate, timeRange, onTimeRangeChange, activeFilters, onToggleFilter, showOceanWeather, onToggleOceanWeather }) => {
   const currentYear = new Date().getFullYear();
   const startYear = 2023;
   
@@ -114,6 +119,38 @@ const Sidebar: React.FC<SidebarProps> = ({ showHeatmap, onToggleHeatmap, showSoc
             <label className="flex items-center space-x-3 cursor-pointer"><input type="checkbox" defaultChecked disabled className="accent-blue-500 w-4 h-4 bg-slate-700 border-slate-600 rounded opacity-50" /> <span className="opacity-50">Hazard Reports</span></label>
             <label className="flex items-center space-x-3 cursor-pointer"><input type="checkbox" checked={showHeatmap} onChange={onToggleHeatmap} className="accent-blue-500 w-4 h-4 bg-slate-700 border-slate-600 rounded" /><span>Heatmaps</span></label>
             <label className="flex items-center space-x-3 cursor-pointer"><input type="checkbox" checked={showSocialMedia} onChange={onToggleSocialMedia} className="accent-blue-500 w-4 h-4 bg-slate-700 border-slate-600 rounded" /><span>Social Media Reports</span></label>
+            <label className="flex items-center space-x-3 cursor-pointer"><input type="checkbox" checked={showOceanWeather} onChange={onToggleOceanWeather} className="accent-blue-500 w-4 h-4 bg-slate-700 border-slate-600 rounded" /><span>Ocean Weather</span></label>
+        </div>
+        <div className="space-y-4">
+            <h3 className="font-semibold text-slate-300">Hazard Types</h3>
+            <label className="flex items-center space-x-3 cursor-pointer">
+                <input type="checkbox" checked={activeFilters.includes(HazardType.OIL_SPILL)} onChange={() => onToggleFilter(HazardType.OIL_SPILL)} className="accent-red-500 w-4 h-4 bg-slate-700 border-slate-600 rounded" />
+                <span className="flex items-center space-x-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500"></span>
+                    <span>Oil Spills</span>
+                </span>
+            </label>
+            <label className="flex items-center space-x-3 cursor-pointer">
+                <input type="checkbox" checked={activeFilters.includes(HazardType.DEBRIS)} onChange={() => onToggleFilter(HazardType.DEBRIS)} className="accent-orange-500 w-4 h-4 bg-slate-700 border-slate-600 rounded" />
+                <span className="flex items-center space-x-2">
+                    <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+                    <span>Debris</span>
+                </span>
+            </label>
+            <label className="flex items-center space-x-3 cursor-pointer">
+                <input type="checkbox" checked={activeFilters.includes(HazardType.POLLUTION)} onChange={() => onToggleFilter(HazardType.POLLUTION)} className="accent-cyan-500 w-4 h-4 bg-slate-700 border-slate-600 rounded" />
+                <span className="flex items-center space-x-2">
+                    <span className="w-3 h-3 rounded-full bg-cyan-500"></span>
+                    <span>Pollution</span>
+                </span>
+            </label>
+            <label className="flex items-center space-x-3 cursor-pointer">
+                <input type="checkbox" checked={activeFilters.includes(HazardType.OTHER)} onChange={() => onToggleFilter(HazardType.OTHER)} className="accent-violet-500 w-4 h-4 bg-slate-700 border-slate-600 rounded" />
+                <span className="flex items-center space-x-2">
+                    <span className="w-3 h-3 rounded-full bg-violet-500"></span>
+                    <span>Other</span>
+                </span>
+            </label>
         </div>
          <div className="space-y-4">
             <h3 className="font-semibold text-slate-300">Time Range</h3>
@@ -144,14 +181,14 @@ const Sidebar: React.FC<SidebarProps> = ({ showHeatmap, onToggleHeatmap, showSoc
   );
 };
 
-const HazardDetailCard: React.FC<{ report: HazardReport, onClose: () => void }> = ({ report, onClose }) => {
+const HazardDetailCard: React.FC<{ report: HazardReport, onClose: () => void, showWeather: boolean }> = ({ report, onClose, showWeather }) => {
     // Construct full image URL if it's a relative path
     const imageSrc = report.imageUrl && !report.imageUrl.startsWith('http') && report.imageUrl.startsWith('/uploads')
       ? `http://localhost:3000${report.imageUrl}`
       : report.imageUrl || 'https://picsum.photos/seed/hazard/400/300';
     
     return (
-    <div className="absolute top-1/2 -translate-y-1/2 right-4 z-[1000] w-96 bg-slate-800/50 backdrop-blur-md border border-slate-700 rounded-xl p-6">
+    <div className="absolute top-24 right-4 z-[1000] w-96 max-h-[calc(100vh-8rem)] overflow-y-auto bg-slate-800/50 backdrop-blur-md border border-slate-700 rounded-xl p-6 space-y-4">
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
         <img src={imageSrc} alt={report.type} className="rounded-lg w-full h-48 object-cover mb-4" onError={(e) => {
           // Fallback to placeholder if image fails to load
@@ -159,7 +196,7 @@ const HazardDetailCard: React.FC<{ report: HazardReport, onClose: () => void }> 
         }} />
         <span className="text-xs font-bold uppercase text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded-full">{report.type}</span>
         <h2 className="text-2xl font-bold text-white mt-2 mb-2">{`${report.type} Report`}</h2>
-        {report.verified && <p className="text-sm text-green-400 font-semibold mb-4">Verified Report</p>}
+        {report.verified && <p className="text-sm text-green-400 font-semibold mb-4">✓ Verified Report</p>}
         <div className="space-y-3 text-slate-300">
             <p><strong>Reported:</strong> {report.timestamp}</p>
             <p><strong>Location:</strong> {report.location.lat.toFixed(4)}° N, {report.location.lng.toFixed(4)}° W</p>
@@ -172,6 +209,16 @@ const HazardDetailCard: React.FC<{ report: HazardReport, onClose: () => void }> 
                 </div>
             </div>
         </div>
+        
+        {showWeather && (
+            <div className="border-t border-slate-700 pt-4">
+                <OceanWeatherWidget 
+                    lat={report.location.lat} 
+                    lng={report.location.lng}
+                    hazardType={report.type}
+                />
+            </div>
+        )}
     </div>
     );
 };
@@ -253,6 +300,8 @@ export const MapPage: React.FC<MapPageProps> = ({ onReportHazard, onNavigate, us
     const [selectedSocialPost, setSelectedSocialPost] = useState<SocialMediaReport | null>(null);
     const [showHeatmap, setShowHeatmap] = useState(false);
     const [showSocialMedia, setShowSocialMedia] = useState(true);
+    const [showOceanWeather, setShowOceanWeather] = useState(true);
+    const [activeFilters, setActiveFilters] = useState<HazardType[]>([HazardType.OIL_SPILL, HazardType.DEBRIS, HazardType.POLLUTION, HazardType.OTHER]);
     const [timeRange, setTimeRange] = useState(new Date().getFullYear() + (new Date().getMonth() / 12));
     const [mapCenter, setMapCenter] = useState<[number, number]>([20, -40]);
     const [mapZoom, setMapZoom] = useState(3);
@@ -322,6 +371,18 @@ export const MapPage: React.FC<MapPageProps> = ({ onReportHazard, onNavigate, us
     const handleRefresh = async () => {
         await fetchHazards();
     };
+
+    const handleToggleFilter = (type: HazardType) => {
+        setActiveFilters(prev => 
+            prev.includes(type) 
+                ? prev.filter(t => t !== type)
+                : [...prev, type]
+        );
+    };
+
+    const filteredHazards = hazardReports.filter(report => 
+        activeFilters.includes(report.type)
+    );
 
     const handleSearch = (query: string) => {
         // Try to parse coordinates
@@ -408,12 +469,12 @@ export const MapPage: React.FC<MapPageProps> = ({ onReportHazard, onNavigate, us
                     />
                 )}
 
-                {hazardReports.length === 0 && !loading && (
+                {filteredHazards.length === 0 && !loading && (
                     <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[1000] bg-slate-800/90 text-white px-6 py-4 rounded-lg">
-                        <p>No hazard reports found. Be the first to report one!</p>
+                        <p>No hazard reports found. {activeFilters.length === 0 ? 'Enable some filters to see reports.' : 'Be the first to report one!'}</p>
                     </div>
                 )}
-                {hazardReports.map((report) => (
+                {filteredHazards.map((report) => (
                     <Marker
                         key={report.id}
                         position={[report.location.lat, report.location.lng]}
@@ -462,9 +523,13 @@ export const MapPage: React.FC<MapPageProps> = ({ onReportHazard, onNavigate, us
                 onNavigate={onNavigate}
                 timeRange={timeRange}
                 onTimeRangeChange={setTimeRange}
+                activeFilters={activeFilters}
+                onToggleFilter={handleToggleFilter}
+                showOceanWeather={showOceanWeather}
+                onToggleOceanWeather={() => setShowOceanWeather(!showOceanWeather)}
             />
 
-            {selectedHazard && <HazardDetailCard report={selectedHazard} onClose={() => setSelectedHazard(null)} />}
+            {selectedHazard && <HazardDetailCard report={selectedHazard} onClose={() => setSelectedHazard(null)} showWeather={showOceanWeather} />}
             {selectedSocialPost && <SocialMediaCard report={selectedSocialPost} onClose={() => setSelectedSocialPost(null)} />}
             
             <button 

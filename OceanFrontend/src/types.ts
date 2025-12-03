@@ -7,6 +7,7 @@ export enum Page {
     LOGIN,
     SIGNUP,
     PROFILE,
+    GOVERNMENT_ALERTS,
 }
 
 export enum HazardType {
