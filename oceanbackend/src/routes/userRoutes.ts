@@ -13,7 +13,7 @@ router.use(authenticate);
 // Get current user's profile
 router.get('/profile', async (req: AuthRequest, res: Response) => {
   try {
-    const user = req.user;
+    const user: any = req.user;
     if (!user) {
       res.status(401).json({ message: 'User not found' });
       return;
@@ -108,7 +108,7 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
     }
 
     // Update user
-    const updatedUser = await User.findByIdAndUpdate(
+    const updatedUser: any = await User.findByIdAndUpdate(
       user._id,
       { $set: updates },
       { new: true, runValidators: true }

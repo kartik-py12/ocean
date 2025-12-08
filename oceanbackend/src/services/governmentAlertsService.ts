@@ -52,12 +52,8 @@ interface ProcessedAlert {
   instruction?: string;
 }
 
-/**
- * Fetch active marine/coastal alerts from NOAA
- */
 export const getNOAAAlerts = async (): Promise<ProcessedAlert[]> => {
   try {
-    // Fetch marine and coastal alerts
     const response = await axios.get<{ features: NOAAAlert[] }>(
       'https://api.weather.gov/alerts/active?message_type=alert',
       {
@@ -70,17 +66,15 @@ export const getNOAAAlerts = async (): Promise<ProcessedAlert[]> => {
     if (!response.data || !response.data.features) {
       return [];
     }
-
-    // Filter for marine/ocean/coastal related alerts
     const marineKeywords = ['marine', 'coastal', 'ocean', 'tsunami', 'beach', 'surf', 'rip current', 'storm surge', 'hurricane', 'tropical'];
-    
+
     const alerts = response.data.features
       .filter(alert => {
         const event = alert.properties.event.toLowerCase();
         const desc = alert.properties.description.toLowerCase();
         const area = alert.properties.areaDesc.toLowerCase();
-        
-        return marineKeywords.some(keyword => 
+
+        return marineKeywords.some(keyword =>
           event.includes(keyword) || desc.includes(keyword) || area.includes(keyword)
         );
       })
@@ -105,12 +99,8 @@ export const getNOAAAlerts = async (): Promise<ProcessedAlert[]> => {
   }
 };
 
-/**
- * Fetch recent earthquakes from USGS (potentially tsunami-causing)
- */
 export const getUSGSEarthquakes = async (): Promise<ProcessedAlert[]> => {
   try {
-    // Fetch significant earthquakes from past 7 days (magnitude 4.5+)
     const response = await axios.get<{ features: USGSEarthquake[] }>(
       'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4.5&limit=50&orderby=time',
       {
@@ -124,12 +114,10 @@ export const getUSGSEarthquakes = async (): Promise<ProcessedAlert[]> => {
       return [];
     }
 
-    // Filter for submarine earthquakes (depth < 70km and near ocean)
     const earthquakes = response.data.features
       .filter(eq => {
         const depth = eq.geometry.coordinates[2];
         const mag = eq.properties.mag;
-        // Include if significant magnitude or has tsunami flag
         return (depth < 70 && mag >= 5.0) || eq.properties.tsunami === 1;
       })
       .map(eq => ({
@@ -156,9 +144,6 @@ export const getUSGSEarthquakes = async (): Promise<ProcessedAlert[]> => {
   }
 };
 
-/**
- * Get all government alerts (combined NOAA + USGS)
- */
 export const getAllGovernmentAlerts = async (): Promise<{
   alerts: ProcessedAlert[];
   summary: {

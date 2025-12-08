@@ -2,9 +2,6 @@ import { Request, Response } from 'express';
 import { getAllGovernmentAlerts } from '../services/governmentAlertsService';
 import { getOceanWeather, getMarineForecast, getWindDirection, getSeaConditions } from '../services/oceanWeatherService';
 
-/**
- * Get all government alerts (NOAA + USGS)
- */
 export const getGovernmentAlerts = async (req: Request, res: Response): Promise<void> => {
   try {
     const result = await getAllGovernmentAlerts();
@@ -24,9 +21,6 @@ export const getGovernmentAlerts = async (req: Request, res: Response): Promise<
   }
 };
 
-/**
- * Get ocean weather at specific coordinates
- */
 export const getWeatherAtLocation = async (req: Request, res: Response): Promise<void> => {
   try {
     const { lat, lng } = req.query;
@@ -51,7 +45,6 @@ export const getWeatherAtLocation = async (req: Request, res: Response): Promise
       return;
     }
 
-    // Add sea conditions based on wind speed
     const seaConditions = getSeaConditions(weather.wind.speed);
     const windDirection = getWindDirection(weather.wind.direction);
 
@@ -75,9 +68,6 @@ export const getWeatherAtLocation = async (req: Request, res: Response): Promise
   }
 };
 
-/**
- * Get marine forecast for next 24 hours
- */
 export const getForecastAtLocation = async (req: Request, res: Response): Promise<void> => {
   try {
     const { lat, lng } = req.query;

@@ -3,15 +3,13 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Create reusable transporter object using SMTP transport
 const createTransporter = () => {
-  // For Gmail or other SMTP services
   if (process.env.EMAIL_SERVICE === 'gmail' || process.env.SMTP_HOST) {
     return nodemailer.createTransport({
       service: process.env.EMAIL_SERVICE || undefined,
       host: process.env.SMTP_HOST,
       port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      secure: process.env.SMTP_SECURE === 'true',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
@@ -19,7 +17,6 @@ const createTransporter = () => {
     });
   }
 
-  // For development/testing - use ethereal.email or similar
   return nodemailer.createTransport({
     host: 'smtp.ethereal.email',
     port: 587,
@@ -42,18 +39,14 @@ export interface EmailNotificationData {
 export const sendHazardNotificationEmail = async (data: EmailNotificationData): Promise<boolean> => {
   try {
     const oceanAuthorityEmail = process.env.OCEAN_AUTHORITY_EMAIL;
-    
+
     if (!oceanAuthorityEmail) {
-      console.warn('❌ OCEAN_AUTHORITY_EMAIL not configured in .env file');
-      console.warn('   Please add OCEAN_AUTHORITY_EMAIL=your-email@example.com to your .env file');
+      console.warn('OCEAN_AUTHORITY_EMAIL not configured in .env file');
       return false;
     }
 
-    // Check if email service is configured
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.warn('❌ Email service not configured');
       console.warn('   Please add EMAIL_USER and EMAIL_PASSWORD to your .env file');
-      console.warn('   For Gmail: EMAIL_SERVICE=gmail, EMAIL_USER=your-email@gmail.com, EMAIL_PASSWORD=your-app-password');
       return false;
     }
 
@@ -65,7 +58,7 @@ export const sendHazardNotificationEmail = async (data: EmailNotificationData): 
     const mailOptions = {
       from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@oceanguard.com',
       to: oceanAuthorityEmail,
-      subject: `🚨 New Ocean Hazard Report: ${data.type} - ${severityLabel} Severity`,
+      subject: ` New Ocean Hazard Report: ${data.type} - ${severityLabel} Severity`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -85,7 +78,7 @@ export const sendHazardNotificationEmail = async (data: EmailNotificationData): 
         <body>
           <div class="container">
             <div class="header">
-              <h1>🚨 New Ocean Hazard Report</h1>
+              <h1>New Ocean Hazard Report</h1>
             </div>
             <div class="content">
               <h2>Hazard Details</h2>
@@ -129,79 +122,32 @@ This is an automated notification from OceanGuard.
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully:', info.messageId);
-    console.log('   To:', oceanAuthorityEmail);
     return true;
   } catch (error: any) {
-    console.error('❌ Error sending email:', error.message || error);
-    if (error.code) {
-      console.error('   Error code:', error.code);
-    }
-    if (error.response) {
-      console.error('   SMTP response:', error.response);
-    }
-    if (error.responseCode) {
-      console.error('   Response code:', error.responseCode);
-    }
-    
-    // Common error messages
-    if (error.message?.includes('Invalid login')) {
-      console.error('   💡 Fix: Check your EMAIL_USER and EMAIL_PASSWORD in .env file');
-      console.error('   💡 For Gmail, make sure you\'re using an App Password, not your regular password');
-    } else if (error.message?.includes('Connection')) {
-      console.error('   💡 Fix: Check your SMTP settings (SMTP_HOST, SMTP_PORT) or network connection');
-    } else if (error.message?.includes('timeout')) {
-      console.error('   💡 Fix: SMTP server timeout - check your network or SMTP server status');
-    }
-    
+    console.error(' Error sending email:', error.message || error);
     return false;
   }
 };
 
-/**
- * Generic email sending function
- * @param to - Recipient email address
- * @param subject - Email subject
- * @param html - HTML content of the email
- * @returns Promise<boolean> - True if sent successfully, false otherwise
- */
 export const sendEmail = async (to: string, subject: string, html: string): Promise<boolean> => {
   try {
-    // Check if email service is configured
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.warn('⚠️ Email service not configured - skipping email notification');
-      console.warn('   To enable email notifications, add to .env file:');
-      console.warn('   EMAIL_SERVICE=gmail');
-      console.warn('   EMAIL_USER=your-email@gmail.com');
-      console.warn('   EMAIL_PASSWORD=your-app-password');
       return false;
     }
 
     const transporter = createTransporter();
-    
+
     const mailOptions = {
       from: `"OceanGuard Alert System" <${process.env.EMAIL_USER || 'noreply@oceanguard.com'}>`,
       to,
       subject,
       html,
     };
-
     await transporter.sendMail(mailOptions);
-    console.log(`✅ Email sent successfully to ${to}`);
+    console.log(` Email sent successfully to ${to}`);
     return true;
   } catch (error: any) {
-    console.error(`❌ Error sending email to ${to}:`, error.message);
-    
-    if (error.message?.includes('Invalid login') || error.message?.includes('Authentication failed')) {
-      console.error('   💡 Fix: For Gmail, you need to:');
-      console.error('   1. Enable 2-factor authentication on your Google account');
-      console.error('   2. Generate an App Password at: https://myaccount.google.com/apppasswords');
-      console.error('   3. Use the App Password (16 characters) as EMAIL_PASSWORD in .env');
-      console.error('   4. Set EMAIL_SERVICE=gmail in .env');
-    } else if (error.message?.includes('Connection')) {
-      console.error('   💡 Fix: Check your network connection or SMTP settings');
-    }
-    
+    console.error(`Error sending email to ${to}:`, error.message);
     return false;
   }
 };

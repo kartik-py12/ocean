@@ -41,8 +41,8 @@ const UserSchema: Schema = new Schema({
     required: false,
     validate: {
       validator: function(v: string) {
-        if (!v) return true; // Allow empty/undefined
-        return /^\+?[\d\s\-()]+$/.test(v); // Basic phone validation
+        if (!v) return true; 
+        return /^\+?[\d\s\-()]+$/.test(v); 
       },
       message: 'Please provide a valid phone number'
     }
@@ -73,17 +73,14 @@ const UserSchema: Schema = new Schema({
   },
 });
 
-// Create geospatial index for location-based queries
 UserSchema.index({ location: '2dsphere' });
 
-// Hash password before saving
 UserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password as string, 12);
   next();
 });
 
-// Compare password method
 UserSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
   return await bcrypt.compare(candidatePassword, this.password);
 };
