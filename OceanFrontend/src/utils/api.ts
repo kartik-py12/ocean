@@ -29,7 +29,6 @@ export const api = {
     return response.json();
   },
 
-  // Generic HTTP methods
   async get<T>(endpoint: string): Promise<T> {
     return this.request<T>(endpoint, { method: 'GET' });
   },
@@ -52,7 +51,6 @@ export const api = {
     return this.request<T>(endpoint, { method: 'DELETE' });
   },
 
-  // Auth endpoints
   async login(email: string, password: string) {
     return this.request<{ token: string; user: any }>('/auth/login', {
       method: 'POST',
@@ -67,7 +65,6 @@ export const api = {
     });
   },
 
-  // Hazard endpoints
   async getHazardReports(params?: { type?: string; verified?: boolean; limit?: number; skip?: number; userId?: string }) {
     const queryParams = new URLSearchParams();
     if (params?.type) queryParams.append('type', params.type);
@@ -90,7 +87,6 @@ export const api = {
   }) {
     const token = localStorage.getItem('token');
     
-    // If imageFile is provided, use FormData; otherwise use JSON
     if (data.imageFile) {
       const formData = new FormData();
       formData.append('type', data.type);
@@ -119,7 +115,6 @@ export const api = {
 
       return response.json();
     } else {
-      // Fallback to JSON for backward compatibility
       return this.request<{ message: string; data: any }>('/hazards', {
         method: 'POST',
         body: JSON.stringify({
@@ -133,7 +128,6 @@ export const api = {
     }
   },
 
-  // News endpoints
   async getNewsArticles(params?: { category?: string; source?: string; verificationStatus?: string; limit?: number; skip?: number; sortBy?: string }) {
     const queryParams = new URLSearchParams();
     if (params?.category) queryParams.append('category', params.category);
@@ -153,12 +147,10 @@ export const api = {
     });
   },
 
-  // Analytics endpoints
   async getAnalytics() {
     return this.request<{ data: any }>('/analytics');
   },
 
-  // User endpoints
   async getUserProfile() {
     return this.request<{ user: any; reports: any[]; stats: any }>('/user/profile');
   },
@@ -170,7 +162,6 @@ export const api = {
     });
   },
 
-  // Social Media endpoints
   async getSocialMediaAnalytics(hazardsOnly: boolean = false) {
     const query = hazardsOnly ? '?hazardsOnly=true' : '';
     return this.request<{
@@ -199,7 +190,6 @@ export const api = {
     }>(`/social-media/analytics${query}`);
   },
 
-  // Government Alerts endpoints
   async getGovernmentAlerts() {
     return this.request<{
       data: any[];

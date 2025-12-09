@@ -11,22 +11,17 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
   try {
     console.log('Request body:', req.body);
     console.log('Request file:', req.file);
-    
+
     const { type, location, severity, description } = req.body;
-    
-    // Handle image upload - if file was uploaded, use the file path
-    // Otherwise, use imageUrl from body (for backward compatibility)
+
     let imageUrl = '';
     if (req.file) {
-      // File was uploaded via multer
       imageUrl = `/uploads/hazards/${req.file.filename}`;
       console.log('Image uploaded:', imageUrl);
     } else if (req.body.imageUrl) {
-      // Fallback to imageUrl from body (for base64 or external URLs)
       imageUrl = req.body.imageUrl;
     }
 
-    // Parse location if it's a string (from FormData)
     let locationObj: { lat: number; lng: number };
     if (typeof location === 'string') {
       try {
@@ -34,7 +29,6 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
         console.log('Parsed location from string:', locationObj);
       } catch (e) {
         console.error('Failed to parse location string:', location, e);
-        // If parsing fails, location might be in separate lat/lng fields
         const lat = parseFloat(req.body['location[lat]'] || req.body.lat || '0');
         const lng = parseFloat(req.body['location[lng]'] || req.body.lng || '0');
         locationObj = { lat, lng };
@@ -43,14 +37,12 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
     } else if (location && typeof location === 'object') {
       locationObj = location;
     } else {
-      // Try to get from body fields
       const lat = parseFloat(req.body['location[lat]'] || req.body.lat || '0');
       const lng = parseFloat(req.body['location[lng]'] || req.body.lng || '0');
       locationObj = { lat, lng };
       console.log('Using body fields for location:', locationObj);
     }
 
-    // Validate location
     if (!locationObj || typeof locationObj.lat !== 'number' || typeof locationObj.lng !== 'number') {
       res.status(400).json({ message: 'Invalid location data' });
       return;
@@ -65,10 +57,6 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
       reportedBy: req.user!._id,
     });
 
-    // Check if email has already been sent for a similar disaster in the same location
-    // We consider it the same disaster if:
-    // 1. Same type
-    // 2. Within 0.1 degrees (approximately 11km) of the same location
     const existingNotification = await EmailNotification.findOne({
       type: type,
       'location.lat': { $gte: locationObj.lat - 0.1, $lte: locationObj.lat + 0.1 },
@@ -77,7 +65,6 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
     });
 
     if (!existingNotification) {
-      // Send email notification to ocean authority
       const reportedBy = req.user!.name || req.user!.email || 'Unknown User';
       const emailSent = await sendHazardNotificationEmail({
         type,
@@ -87,8 +74,6 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
         reportedBy,
         reportId: String(hazardReport._id),
       });
-
-      // Record the email notification
       await EmailNotification.create({
         reportId: hazardReport._id,
         type,
@@ -106,7 +91,6 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
       console.log(`Skipping email notification - similar disaster already reported at this location (Report ID: ${existingNotification.reportId})`);
     }
 
-    // Create a news article from this hazard report
     try {
       const severityLabels: { [key: number]: string } = {
         1: 'Low',
@@ -120,17 +104,15 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
         9: 'Critical',
         10: 'Critical',
       };
-      
+
       const severityLabel = severityLabels[severity] || 'Medium';
       const reporterName = typeof req.user === 'object' && req.user ? (req.user.name || req.user.email || 'Anonymous') : 'Anonymous';
-      
-      // Generate news title and summary
+
       const title = `${severityLabel} Severity ${type} Reported at ${locationObj.lat.toFixed(2)}°N, ${locationObj.lng.toFixed(2)}°W`;
-      const summary = description 
+      const summary = description
         ? `${type} of ${severityLabel.toLowerCase()} severity has been reported. ${description}`
         : `A ${severityLabel.toLowerCase()} severity ${type.toLowerCase()} has been reported in the ocean. Location: ${locationObj.lat.toFixed(4)}°N, ${locationObj.lng.toFixed(4)}°W. Reported by ${reporterName}.`;
-      
-      // Create news article linked to the hazard report
+
       await NewsArticle.create({
         title,
         summary,
@@ -141,14 +123,12 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
         verificationStatus: 'unverified',
         hazardReportId: hazardReport._id,
       });
-      
+
       console.log(`News article created for hazard report ${hazardReport._id}`);
     } catch (newsError: any) {
-      // Don't fail the report creation if news article creation fails
       console.error('Error creating news article:', newsError);
     }
 
-    // Emit Socket.io event for real-time notifications
     io.emit('hazard-reported', {
       id: hazardReport._id,
       type: hazardReport.type,
@@ -160,7 +140,6 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
     });
     console.log(`Socket.io event emitted for hazard ${hazardReport._id}`);
 
-    // Send notifications to nearby users (within 10km)
     try {
       const notificationResult = await notifyNearbyUsers({
         title: `${type} Reported Nearby`,
@@ -171,12 +150,11 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
         },
         severity: severity.toString(),
         hazardType: type
-      }, 10000); // 10km radius
+      }, 10000);
 
       console.log(`Notified ${notificationResult.notifiedCount} nearby users`);
     } catch (notificationError: any) {
       console.error('Error sending nearby user notifications:', notificationError);
-      // Don't fail the hazard report if notification fails
     }
 
     res.status(201).json({
@@ -190,32 +168,32 @@ export const createHazardReport = async (req: AuthRequest, res: Response): Promi
 };
 
 export const getHazardReports = async (req: Request | AuthRequest, res: Response): Promise<void> => {
-    try {
-        const { type, verified, limit = 100, skip = 0, userId } = req.query;
+  try {
+    const { type, verified, limit = 100, skip = 0, userId } = req.query;
 
-        const filter: any = {};
-        if (type) filter.type = type;
-        if (verified !== undefined) filter.verified = verified === 'true';
-        if (userId) filter.reportedBy = userId;
+    const filter: any = {};
+    if (type) filter.type = type;
+    if (verified !== undefined) filter.verified = verified === 'true';
+    if (userId) filter.reportedBy = userId;
 
-        const reports = await HazardReport.find(filter)
-            .populate('reportedBy', 'name email')
-            .sort({ createdAt: -1 })
-            .limit(Number(limit))
-            .skip(Number(skip));
+    const reports = await HazardReport.find(filter)
+      .populate('reportedBy', 'name email')
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .skip(Number(skip));
 
-        const total = await HazardReport.countDocuments(filter);
+    const total = await HazardReport.countDocuments(filter);
 
-        res.status(200).json({
-            message: 'Hazard reports retrieved successfully',
-            data: reports,
-            total,
-            limit: Number(limit),
-            skip: Number(skip),
-        });
-    } catch (error: any) {
-        res.status(500).json({ message: error.message || 'Error retrieving hazard reports' });
-    }
+    res.status(200).json({
+      message: 'Hazard reports retrieved successfully',
+      data: reports,
+      total,
+      limit: Number(limit),
+      skip: Number(skip),
+    });
+  } catch (error: any) {
+    res.status(500).json({ message: error.message || 'Error retrieving hazard reports' });
+  }
 };
 
 export const getHazardReportById = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -250,7 +228,6 @@ export const updateHazardReport = async (req: AuthRequest, res: Response): Promi
       return;
     }
 
-    // Only allow updating verified status and other fields
     if (verified !== undefined) report.verified = verified;
     if (severity !== undefined) report.severity = severity;
     if (description !== undefined) report.description = description;

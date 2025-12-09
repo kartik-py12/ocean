@@ -10,9 +10,6 @@ const twilioWhatsAppNumber = process.env.TWILIO_WHATSAPP_NUMBER; // Format: what
 
 const twilioClient = accountSid && authToken ? twilio(accountSid, authToken) : null;
 
-/**
- * Get human-readable address from coordinates using reverse geocoding
- */
 const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
   try {
     const response = await axios.get(
@@ -45,13 +42,9 @@ interface HazardNotificationData {
   hazardType: string;
 }
 
-/**
- * Find users within a specified radius (in meters) from a given location
- * Uses MongoDB geospatial queries with $near operator
- */
 export const findNearbyUsers = async (
   location: { type: string; coordinates: number[] },
-  radiusInMeters: number = 10000 // Default 10km
+  radiusInMeters: number = 10000 
 ) => {
   try {
     const nearbyUsers = await User.find({
@@ -73,9 +66,8 @@ export const findNearbyUsers = async (
   }
 };
 
-/**
- * Send email notification to a user about a nearby hazard
- */
+
+
 export const sendHazardEmailNotification = async (
   userEmail: string,
   userName: string,
@@ -86,7 +78,7 @@ export const sendHazardEmailNotification = async (
     const address = await getAddressFromCoordinates(lat, lng);
     const googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
     
-    const subject = `⚠️ Ocean Hazard Alert: ${hazard.title}`;
+    const subject = `Ocean Hazard Alert: ${hazard.title}`;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #dc2626;">🌊 Ocean Hazard Alert</h2>
@@ -100,7 +92,7 @@ export const sendHazardEmailNotification = async (
           <p><strong>Description:</strong> ${hazard.description}</p>
           <p><strong>Location:</strong> ${address}</p>
           <p style="font-size: 12px; color: #6b7280;">Coordinates: ${lat.toFixed(4)}°, ${lng.toFixed(4)}°</p>
-          <p><a href="${googleMapsLink}" style="color: #2563eb;">📍 View on Google Maps</a></p>
+          <p><a href="${googleMapsLink}" style="color: #2563eb;">View on Google Maps</a></p>
         </div>
         
         <p>Please exercise caution in the affected area. Stay safe!</p>
@@ -143,10 +135,9 @@ export const sendHazardWhatsAppNotification = async (
     const address = await getAddressFromCoordinates(lat, lng);
     const googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
     
-    // Format phone number for WhatsApp (must start with +)
     const formattedPhone = userPhone.startsWith('+') ? userPhone : `+${userPhone}`;
     
-    const message = `🌊 *OceanGuard Hazard Alert*\n\nHello ${userName},\n\nA new ocean hazard has been reported near you:\n\n*${hazard.title}*\nType: ${hazard.hazardType}\nSeverity: ${hazard.severity}\n\n${hazard.description}\n\n📍 *Location:*\n${address}\n\n🗺️ View on map: ${googleMapsLink}\n\nPlease exercise caution. Stay safe! 🛡️`;
+    const message = ` *OceanGuard Hazard Alert*\n\nHello ${userName},\n\nA new ocean hazard has been reported near you:\n\n*${hazard.title}*\nType: ${hazard.hazardType}\nSeverity: ${hazard.severity}\n\n${hazard.description}\n\n📍 *Location:*\n${address}\n\n🗺️ View on map: ${googleMapsLink}\n\nPlease exercise caution. Stay safe! 🛡️`;
 
     await twilioClient.messages.create({
       body: message,
@@ -160,10 +151,6 @@ export const sendHazardWhatsAppNotification = async (
   }
 };
 
-/**
- * Send notifications to all users within radius of a hazard
- * Sends both email and WhatsApp notifications if available
- */
 export const notifyNearbyUsers = async (
   hazard: HazardNotificationData,
   radiusInMeters: number = 10000
@@ -176,14 +163,12 @@ export const notifyNearbyUsers = async (
     const notificationPromises = nearbyUsers.map(async (user) => {
       const promises: Promise<void>[] = [];
 
-      // Send email notification if user has email
       if (user.email) {
         promises.push(
           sendHazardEmailNotification(user.email, user.name, hazard)
         );
       }
 
-      // Send WhatsApp notification if user has phone
       if (user.phone) {
         promises.push(
           sendHazardWhatsAppNotification(user.phone, user.name, hazard)

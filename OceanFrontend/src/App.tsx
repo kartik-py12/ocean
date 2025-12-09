@@ -26,7 +26,6 @@ const AppContent: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [hazardNotifications, setHazardNotifications] = useState<any[]>([]);
 
-  // Initialize Socket.io connection
   useEffect(() => {
     const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
     const socketConnection = io(socketUrl, {
@@ -45,7 +44,7 @@ const AppContent: React.FC = () => {
     // Listen for hazard alerts
     socketConnection.on('hazard-reported', (hazard: any) => {
       console.log('🚨 New hazard reported:', hazard);
-      
+
       // Add to notifications
       setHazardNotifications(prev => [{
         id: hazard.id,
@@ -74,7 +73,6 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
-  // Request notification permission on mount
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -82,7 +80,6 @@ const AppContent: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Check for existing session
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     if (storedToken && storedUser) {
@@ -93,7 +90,6 @@ const AppContent: React.FC = () => {
     }
   }, []);
 
-  // Helper function to convert Page enum to route path
   const handleNavigate = (page: Page) => {
     const routes: Record<Page, string> = {
       [Page.HOME]: '/',
@@ -108,7 +104,7 @@ const AppContent: React.FC = () => {
     navigate(routes[page]);
   };
 
-  const handleLogin = (email: string, authToken: string) => {
+  const handleLogin = (authToken: string) => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
@@ -131,7 +127,6 @@ const AppContent: React.FC = () => {
     setIsReporting(false);
     setShowSuccessToast(true);
     setTimeout(() => setShowSuccessToast(false), 5000);
-    // Trigger a page refresh or data reload if on map page
     window.dispatchEvent(new Event('hazardReportSubmitted'));
   };
 
@@ -146,25 +141,25 @@ const AppContent: React.FC = () => {
         <Route path="/signup" element={<SignupPage onNavigate={handleNavigate} onLogin={handleLogin} />} />
         <Route path="/profile" element={user ? <ProfilePage onNavigate={handleNavigate} user={user} onLogout={handleLogout} /> : <Navigate to="/login" />} />
         <Route path="/government-alerts" element={<GovernmentAlertsPage onNavigate={handleNavigate} user={user} />} />
-        
+
         {/* Admin Routes - Protected */}
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/reports" element={<ManageReports />} />
         <Route path="/admin/users" element={<ManageUsers />} />
-        
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      
+
       <ReportHazardWizard
         isOpen={isReporting}
         onClose={() => setIsReporting(false)}
         onSubmit={handleReportSubmit}
       />
-      <NotificationCenter 
+      <NotificationCenter
         notifications={hazardNotifications}
         onClearAll={() => setHazardNotifications([])}
         onMarkAsRead={(id: string) => {
-          setHazardNotifications(prev => 
+          setHazardNotifications(prev =>
             prev.map(n => n.id === id ? { ...n, read: true } : n)
           );
         }}

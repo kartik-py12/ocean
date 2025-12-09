@@ -36,9 +36,6 @@ interface OceanWeatherData {
   timestamp: string;
 }
 
-/**
- * Get ocean/marine weather conditions at specific coordinates
- */
 export const getOceanWeather = async (lat: number, lng: number): Promise<OceanWeatherData | null> => {
   try {
     if (!OPENWEATHER_API_KEY) {
@@ -51,7 +48,7 @@ export const getOceanWeather = async (lat: number, lng: number): Promise<OceanWe
         lat,
         lon: lng,
         appid: OPENWEATHER_API_KEY,
-        units: 'metric' // Celsius, m/s
+        units: 'metric' 
       }
     });
 
@@ -90,9 +87,9 @@ export const getOceanWeather = async (lat: number, lng: number): Promise<OceanWe
   }
 };
 
-/**
- * Get marine forecast data (if available)
- */
+
+
+
 export const getMarineForecast = async (lat: number, lng: number): Promise<any> => {
   try {
     if (!OPENWEATHER_API_KEY) {
@@ -100,7 +97,6 @@ export const getMarineForecast = async (lat: number, lng: number): Promise<any> 
       return null;
     }
 
-    // Get 5-day forecast
     const response = await axios.get(`${OPENWEATHER_BASE_URL}/forecast`, {
       params: {
         lat,
@@ -131,18 +127,15 @@ export const getMarineForecast = async (lat: number, lng: number): Promise<any> 
   }
 };
 
-/**
- * Get wind direction as compass direction
- */
 export const getWindDirection = (degrees: number): string => {
   const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   const index = Math.round(degrees / 22.5) % 16;
   return directions[index];
 };
 
-/**
- * Determine sea conditions based on wind speed
- */
+
+
+
 export const getSeaConditions = (windSpeedKmh: number): {
   condition: string;
   waveHeightRange: string;

@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import HazardReport from '../models/HazardReport';
 import User from '../models/User';
 
-// Get admin dashboard stats
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const [
@@ -36,7 +35,6 @@ export const getDashboardStats = async (req: Request, res: Response) => {
   }
 };
 
-// Get all reports with filters
 export const getAllReports = async (req: Request, res: Response) => {
   try {
     const { status, type, page = 1, limit = 20 } = req.query;
@@ -69,7 +67,6 @@ export const getAllReports = async (req: Request, res: Response) => {
   }
 };
 
-// Verify a report
 export const verifyReport = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -97,14 +94,12 @@ export const verifyReport = async (req: Request, res: Response) => {
   }
 };
 
-// Decline a report
 export const declineReport = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
     const adminId = (req as any).user._id;
 
-    // Find and populate report before deleting
     const report = await HazardReport.findById(id).populate('reportedBy', 'name email');
 
     if (!report) {
@@ -114,7 +109,6 @@ export const declineReport = async (req: Request, res: Response) => {
     const reportedUser = report.reportedBy as any;
     const declineReason = reason || 'Report does not meet verification criteria';
 
-    // Send email notification to user
     if (reportedUser && reportedUser.email) {
       try {
         const { sendEmail } = await import('../services/emailService');
@@ -129,7 +123,6 @@ export const declineReport = async (req: Request, res: Response) => {
       }
     }
 
-    // Delete the report from database
     await HazardReport.findByIdAndDelete(id);
 
     res.json({ 
@@ -142,7 +135,6 @@ export const declineReport = async (req: Request, res: Response) => {
   }
 };
 
-// Delete a report
 export const deleteReport = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -160,7 +152,6 @@ export const deleteReport = async (req: Request, res: Response) => {
   }
 };
 
-// Get all users
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 20, search } = req.query;
@@ -196,7 +187,6 @@ export const getAllUsers = async (req: Request, res: Response) => {
   }
 };
 
-// Update user role
 export const updateUserRole = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -223,7 +213,6 @@ export const updateUserRole = async (req: Request, res: Response) => {
   }
 };
 
-// Toggle user active status
 export const toggleUserStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -247,7 +236,6 @@ export const toggleUserStatus = async (req: Request, res: Response) => {
   }
 };
 
-// Delete user
 export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
