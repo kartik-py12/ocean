@@ -34,7 +34,7 @@ export const ManageReports: React.FC = () => {
     try {
       setLoading(true);
       const status = filter === 'all' ? '' : filter;
-      const response = await api.get(`/admin/reports?status=${status}&page=${page}&limit=10`);
+      const response: { reports: Report[], pagination: { pages: number } } = await api.get(`/admin/reports?status=${status}&page=${page}&limit=10`);
       setReports(response.reports);
       setTotalPages(response.pagination.pages);
     } catch (error) {
@@ -126,31 +126,28 @@ export const ManageReports: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                filter === 'all'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium ${filter === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
             >
               All Reports
             </button>
             <button
               onClick={() => setFilter('unverified')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                filter === 'unverified'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium ${filter === 'unverified'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
             >
               Pending
             </button>
             <button
               onClick={() => setFilter('admin-verified')}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                filter === 'admin-verified'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+              className={`px-4 py-2 rounded-lg font-medium ${filter === 'admin-verified'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
             >
               Verified
             </button>

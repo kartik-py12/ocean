@@ -11,8 +11,8 @@ const createAdminUser = async () => {
 
     const adminData = {
       name: 'Admin',
-      email: 'admin@oceanguard.com',
-      password: 'admin123',
+      email: 'admin1@oceanguard.com',
+      password: 'Admin@123',
       role: 'admin',
       isActive: true,
     };

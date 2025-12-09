@@ -24,8 +24,7 @@ export const AdminDashboard: React.FC = () => {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/dashboard/stats');
-    //   console.log('Fetched stats:', response.reports.total);
+      const response: DashboardStats | null = await api.get('/admin/dashboard/stats');
       setStats(response);
     } catch (error) {
       console.error('Error fetching stats:', error);

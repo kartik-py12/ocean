@@ -25,25 +25,25 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
     location: { coordinates: [0, 0] as number[] }
   });
   const [saveLoading, setSaveLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info', text: string } | null>(null);
   const { latitude, longitude, requestLocation, loading: locationLoading, error: locationError } = useGeolocation();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) return;
-      
+
       try {
         setLoading(true);
         const response = await api.getUserProfile();
         setUserReports(response.reports);
         setStats(response.stats);
-        
+
         // Initialize edit form with user data
         setEditForm({
           name: response.user.name || '',
           email: response.user.email || '',
           phone: response.user.phone || '',
-          location: response.user.location?.coordinates 
+          location: response.user.location?.coordinates
             ? { coordinates: response.user.location.coordinates }
             : { coordinates: [0, 0] }
         });
@@ -55,8 +55,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
           setUserReports(response.data);
           const total = response.data.length;
           const verified = response.data.filter((r: any) => r.verified).length;
-          const avgSev = response.data.length > 0 
-            ? response.data.reduce((sum: number, r: any) => sum + r.severity, 0) / response.data.length 
+          const avgSev = response.data.length > 0
+            ? response.data.reduce((sum: number, r: any) => sum + r.severity, 0) / response.data.length
             : 0;
           setStats({
             totalReports: total,
@@ -118,8 +118,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
       };
 
       // Only include location if coordinates are not [0, 0]
-      if (editForm.location?.coordinates && 
-          (editForm.location.coordinates[0] !== 0 || editForm.location.coordinates[1] !== 0)) {
+      if (editForm.location?.coordinates &&
+        (editForm.location.coordinates[0] !== 0 || editForm.location.coordinates[1] !== 0)) {
         updateData.location = {
           type: 'Point',
           coordinates: editForm.location.coordinates
@@ -127,17 +127,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
       }
 
       await api.updateUserProfile(updateData);
-      
+
       setMessage({ type: 'success', text: 'Profile updated successfully!' });
       setIsEditing(false);
-      
+
       // Refresh profile data
       const response = await api.getUserProfile();
       setEditForm({
         name: response.user.name || '',
         email: response.user.email || '',
         phone: response.user.phone || '',
-        location: response.user.location?.coordinates 
+        location: response.user.location?.coordinates
           ? { coordinates: response.user.location.coordinates }
           : { coordinates: [0, 0] }
       });
@@ -171,12 +171,12 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
         <div className="container mx-auto flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <svg className="w-8 h-8 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM12 4c-2.31 0-4.43.9-6 2.37L12 13.5l6-7.13C16.43 4.9 14.31 4 12 4z"/>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM12 4c-2.31 0-4.43.9-6 2.37L12 13.5l6-7.13C16.43 4.9 14.31 4 12 4z" />
             </svg>
             <span className="text-xl font-bold text-white">OceanGuard</span>
           </div>
           <div className="flex items-center space-x-4">
-            <button onClick={() => onNavigate(Page.HOME)} className="text-slate-300 hover:text-white">
+            <button onClick={() => onNavigate(Page.HOME)} className="text-sm bg-blue-600 hover:bg-blue-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
               Home
             </button>
             <button onClick={onLogout} className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg">
@@ -230,7 +230,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
                     placeholder="Your name"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
                   <input
@@ -241,7 +241,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
                     placeholder="your.email@example.com"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Phone Number <span className="text-slate-500">(Optional - for WhatsApp alerts)</span>
@@ -266,8 +266,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
                     <input
                       type="text"
                       value={editForm.location?.coordinates?.[1] || ''}
-                      onChange={(e) => setEditForm(prev => ({ 
-                        ...prev, 
+                      onChange={(e) => setEditForm(prev => ({
+                        ...prev,
                         location: { coordinates: [prev.location?.coordinates?.[0] || 0, parseFloat(e.target.value) || 0] }
                       }))}
                       className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -276,8 +276,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
                     <input
                       type="text"
                       value={editForm.location?.coordinates?.[0] || ''}
-                      onChange={(e) => setEditForm(prev => ({ 
-                        ...prev, 
+                      onChange={(e) => setEditForm(prev => ({
+                        ...prev,
                         location: { coordinates: [parseFloat(e.target.value) || 0, prev.location?.coordinates?.[1] || 0] }
                       }))}
                       className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -363,7 +363,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate, user, onLo
                         )}
                       </div>
                       <p className="text-sm text-slate-400">
-                        {report.location.lat.toFixed(4)}°, {report.location.lng.toFixed(4)}° • 
+                        {report.location.lat.toFixed(4)}°, {report.location.lng.toFixed(4)}° •
                         Severity: {report.severity}/10
                       </p>
                       {report.description && (
