@@ -835,7 +835,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 - **Issues**: [GitHub Issues](https://github.com/kartik-py12/ocean/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/kartik-py12/ocean/discussions)
-- **Email**: support@oceanguard.app (if configured)
 
 ---
 
